@@ -23,6 +23,18 @@ header h1 small{display:block;font-size:12px;font-weight:500;color:var(--muted);
 #building:hover{border-color:var(--line)} #building:focus{outline:none;border-color:var(--accent);background:#fff}
 #saved{font-size:13px;color:var(--ok);opacity:0;transition:opacity .3s}
 #saved.show{opacity:1}
+.hbtns{display:flex;gap:8px;align-items:center}
+.btn:disabled{opacity:.4;cursor:default}
+/* по-едър изглед (печатът е извън .app и не се променя) */
+html.z1 .app, html.z1 #noteDlg{zoom:1.15}
+html.z2 .app, html.z2 #noteDlg{zoom:1.3}
+/* филтър над таблицата */
+.filter{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin:0 0 12px}
+.filter input[type=search]{width:260px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.filter input[type=search]:focus{outline:none;border-color:var(--accent)}
+.fchk{display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none;font-size:14px}
+.fchk input{accent-color:var(--accent);margin:0;cursor:pointer}
+#fInfo{font-size:13px;color:var(--muted)}
 
 /* file bar */
 .filebar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:14px;border:1px solid}
@@ -212,6 +224,10 @@ dialog#noteDlg::backdrop{background:rgba(0,0,0,.35)}
     <h1><small>Входна каса</small>Неплатени такси</h1>
     <input id="building" placeholder="Напиши адрес / блок / вход…">
     <span id="saved">✓ Запазено</span>
+    <span class="hbtns">
+      <button class="btn" id="undoBtn" type="button" disabled title="Връща последната промяна (Ctrl+Z)">↶ Отмени</button>
+      <button class="btn" id="zoomBtn" type="button" title="Смени размера на буквите и клетките">A+ По-едро</button>
+    </span>
   </header>
 
   <div id="fileBar" class="filebar warn"></div>
@@ -246,6 +262,12 @@ dialog#noteDlg::backdrop{background:rgba(0,0,0,.35)}
     <p class="hint">Кликни върху месец → става <span class="x-demo">10</span> = <b>неплатено</b>, със сумата от „Такса“ в този момент. Кликни пак, за да го изчистиш.
       <b>Десен клик</b> върху месец → пишеш друга сума само за него. Ако смениш таксата, вече отбелязаните месеци <b>не</b> се променят.
       Клик върху името на месеца маркира/изчиства <b>всички</b>. Тикчето до номера = <b>има стаичка</b>, а 📝 до името = <b>бележки</b>.</p>
+    <div class="filter">
+      <input id="fq" type="search" placeholder="🔍 Търси по име или номер">
+      <label class="fchk"><input type="checkbox" id="fDebt"> Само длъжници</label>
+      <span id="fInfo"></span>
+      <button class="btn sm" id="fClear" type="button" hidden>× Покажи всички</button>
+    </div>
     <div class="tablewrap"><table class="grid" id="grid"></table></div>
     <p class="note">„Дълг" включва неплатените месеци от <b>всички</b> години + неплатените допълнителни работи.</p>
   </div>
@@ -336,7 +358,33 @@ function flashSaved(text){
   clearTimeout(savedTimer); savedTimer = setTimeout(() => el.classList.remove("show"), 1400);
 }
 function saveLocal(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){} }
+
+/* ---------- отмяна (само в паметта, до 50 стъпки) ---------- */
+let undoStack = [], lastJson = JSON.stringify(S), lastKey = null, lastUndoAt = 0;
+// Поле, в което се пише в момента – писането в едно и също поле е една стъпка.
+function typingIn(){ const el = document.activeElement; return el && el.matches && el.matches("input:not([type=checkbox]), textarea") ? el : null; }
+function recordUndo(){
+  const now = JSON.stringify(S);
+  if (now === lastJson) return;
+  const key = typingIn(), t = Date.now();
+  if (!(key && key === lastKey && t - lastUndoAt < 3000)){ undoStack.push(lastJson); if (undoStack.length > 50) undoStack.shift(); }
+  lastKey = key; lastUndoAt = t; lastJson = now; renderUndoBtn();
+}
+function resetUndo(){ undoStack = []; lastJson = JSON.stringify(S); lastKey = null; renderUndoBtn(); }
+function renderUndoBtn(){ const b = $("#undoBtn"); if (b) b.disabled = !undoStack.length; }
+function undo(){
+  if (!undoStack.length) return;
+  S = hydrate(JSON.parse(undoStack.pop()));
+  lastJson = JSON.stringify(S); lastKey = null;
+  saveLocal();
+  if (SERVER){ setUnsynced(true); clearTimeout(writeTimer); writeTimer = setTimeout(writeFile, 250); }
+  renderAll(); renderUndoBtn();
+  if ($("#noteDlg").open) renderNotes();
+  flashSaved("↶ Отменено");
+}
+
 function save(){
+  recordUndo();
   saveLocal();
   if (SERVER){ setUnsynced(true); clearTimeout(writeTimer); writeTimer = setTimeout(writeFile, 250); }
   else flashSaved("✓ Запазено само в браузъра");
@@ -376,7 +424,7 @@ async function initFile(){
   if (!SERVER) return;
   try {
     const d = isUnsynced() ? null : await api("load");   // има незаписани промени → те печелят
-    if (d && typeof d === "object" && "unpaid" in d){ S = hydrate(d); saveLocal(); renderAll(); }
+    if (d && typeof d === "object" && "unpaid" in d){ S = hydrate(d); saveLocal(); renderAll(); resetUndo(); }
     initialized = true; fileState = "ok"; renderFileBar();
     if (!d || migrated){ migrated = false; await writeFile(); }   // записва и обновения формат
   } catch(e){ fileState = "error"; fileErr = "Не мога да се свържа с програмата. Пусни <b>Start.bat</b> отново."; renderFileBar(); }
@@ -407,7 +455,7 @@ $("#fileBar").addEventListener("click", e => {
 });
 // Ако програмата е отворена в два таба – дръж ги еднакви.
 window.addEventListener("storage", e => {
-  if (e.key === KEY && e.newValue){ try { S = hydrate(JSON.parse(e.newValue)); renderAll(); } catch(_){} }
+  if (e.key === KEY && e.newValue){ try { S = hydrate(JSON.parse(e.newValue)); renderAll(); resetUndo(); } catch(_){} }
 });
 if (SERVER) setInterval(ping, 30000);
 
@@ -480,7 +528,23 @@ function renderGrid(){
   $("#grid").innerHTML = h;
   document.querySelectorAll("#grid tbody td.m").forEach(td => paintCell(td, td.parentElement.dataset.a));
   updateTotals();
+  applyFilter();
 }
+// Само скрива/показва редове – не прерисува, за да не се губи фокусът.
+function applyFilter(){
+  const q = $("#fq").value.trim().toLowerCase(), only = $("#fDebt").checked;
+  let shown = 0;
+  document.querySelectorAll("#grid tbody tr").forEach(tr => {
+    const a = tr.dataset.a;
+    const ok = (!only || debt(a) > 0) && (!q || (S.names[a] || "").toLowerCase().includes(q) || a === q);
+    tr.hidden = !ok; if (ok) shown++;
+  });
+  const active = !!q || only;
+  $("#fInfo").textContent = active ? `Показани ${shown} от ${N()}` : "";
+  $("#fClear").hidden = !active;
+}
+// Апартаментите, които се виждат в момента (при филтър „маркирай всички“ важи само за тях).
+const visibleApts = () => [...document.querySelectorAll("#grid tbody tr")].filter(tr => !tr.hidden).map(tr => tr.dataset.a);
 function updateTotals(){
   let total = 0, debtors = 0, mcount = 0;
   for (let a = 1; a <= N(); a++){
@@ -522,6 +586,29 @@ $("#extras").addEventListener("click", e => {
   save(); renderExtras(); renderGrid();
 });
 
+$("#undoBtn").onclick = undo;
+document.addEventListener("keydown", e => {
+  if (e.ctrlKey && !e.shiftKey && !e.altKey && e.code === "KeyZ" && !typingIn()){ e.preventDefault(); undo(); }
+});
+$("#fq").addEventListener("input", applyFilter);
+$("#fDebt").addEventListener("change", applyFilter);
+$("#fClear").onclick = () => { $("#fq").value = ""; $("#fDebt").checked = false; applyFilter(); };
+
+/* по-едър изглед – помни се в браузъра, не във файла с данните */
+const UI_KEY = KEY + "-ui";
+let zoomLvl = 0;
+try { zoomLvl = Math.min(2, Math.max(0, +JSON.parse(localStorage.getItem(UI_KEY) || "{}").zoom || 0)); } catch(e){}
+function applyZoom(){
+  const el = document.documentElement;
+  el.classList.remove("z1", "z2"); if (zoomLvl) el.classList.add("z" + zoomLvl);
+  $("#zoomBtn").textContent = ["A+ По-едро", "A+ Още по-едро", "A Нормален размер"][zoomLvl];
+}
+$("#zoomBtn").onclick = () => {
+  zoomLvl = (zoomLvl + 1) % 3; applyZoom();
+  try { localStorage.setItem(UI_KEY, JSON.stringify({ zoom: zoomLvl })); } catch(e){}
+};
+applyZoom();
+
 const grid = $("#grid");
 grid.addEventListener("click", e => {
   const nb = e.target.closest("[data-note]");
@@ -535,14 +622,13 @@ grid.addEventListener("click", e => {
   }
   const th = e.target.closest("th.c-m, th.c-x");
   if (th){
+    const apts = visibleApts(); if (!apts.length) return;
     if (th.classList.contains("c-m")){
-      const k = th.dataset.col; let all = true;
-      for (let a = 1; a <= N(); a++) if (amt(a, k) === undefined){ all = false; break; }
-      for (let a = 1; a <= N(); a++) if (all) setMonth(a, k, false); else if (amt(a, k) === undefined) setMonth(a, k, true);
+      const k = th.dataset.col, all = apts.every(a => amt(a, k) !== undefined);
+      for (const a of apts) if (all) setMonth(a, k, false); else if (amt(a, k) === undefined) setMonth(a, k, true);
     } else {
-      const key = th.dataset.xcol; let all = true;
-      for (let a = 1; a <= N(); a++) if (!xUnpaid(a).includes(key)){ all = false; break; }
-      for (let a = 1; a <= N(); a++) toggleIn(S.extraUnpaid, a, key, !all);
+      const key = th.dataset.xcol, all = apts.every(a => xUnpaid(a).includes(key));
+      for (const a of apts) toggleIn(S.extraUnpaid, a, key, !all);
     }
     save(); renderGrid();
   }
