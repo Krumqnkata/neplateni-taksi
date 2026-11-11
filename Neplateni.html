@@ -195,6 +195,15 @@ dialog#noteDlg::backdrop{background:rgba(0,0,0,.35)}
 #ndText:focus{outline:none;border-color:var(--accent)}
 .nd-btns{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .nd-btns small{color:var(--muted)}
+.nd-left{display:flex;flex-direction:column;gap:3px}
+.np{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);cursor:pointer;white-space:nowrap;user-select:none}
+.np input{margin:0;accent-color:var(--accent);cursor:pointer}
+.np:has(input:checked){color:var(--accent);font-weight:600}
+#ndList li.pr{box-shadow:inset 3px 0 0 var(--accent)}
+#ndList li .np{padding-top:2px}
+.p-table.notice tr.has-note td{border-bottom:0;padding-bottom:2px}
+.p-table.notice tr.p-noterow td{padding-top:0;font-size:9.5pt;font-style:italic}
+.p-table.notice tr.p-noterow small{font-style:normal}
 </style>
 </head>
 <body>
@@ -267,7 +276,7 @@ dialog#noteDlg::backdrop{background:rgba(0,0,0,.35)}
     <h3 id="ndTitle"></h3>
     <ul id="ndList"></ul>
     <textarea id="ndText" rows="3" placeholder="Напр. Обеща да плати до 15-ти. Разбрахме се на части…"></textarea>
-    <div class="nd-btns"><small>Датата се слага сама.</small>
+    <div class="nd-btns"><span class="nd-left"><label class="np"><input type="checkbox" id="ndPrint"> 🖨 Да излиза на листа с длъжниците</label><small>Датата се слага сама.</small></span>
       <span><button class="btn" id="ndClose" type="button">Затвори</button> <button class="btn primary" id="ndAdd" type="button">+ Добави бележка</button></span></div>
   </div>
 </dialog>
@@ -563,26 +572,29 @@ const notesOf = a => S.notes[a] || [];
 const isoToday = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
 function noteBtn(a){
   const n = notesOf(a).length;
-  const tip = n ? notesOf(a).map(x => `${fmtDate(x.d)} – ${x.t}`).join("\n") : "Добави бележка";
+  const tip = n ? notesOf(a).map(x => `${x.p ? "🖨 " : ""}${fmtDate(x.d)} – ${x.t}`).join("\n") : "Добави бележка";
   return `<button type="button" class="nb${n ? " has" : ""}" data-note="${a}" title="${esc(tip)}">📝${n ? `<span>${n}</span>` : ""}</button>`;
 }
 let noteApt = null;
 function openNotes(a){
-  noteApt = a; renderNotes(); $("#ndText").value = "";
+  noteApt = a; renderNotes(); $("#ndText").value = ""; $("#ndPrint").checked = false;
   $("#noteDlg").showModal(); $("#ndText").focus();
 }
 function renderNotes(){
   const a = noteApt, list = notesOf(a);
   $("#ndTitle").textContent = `Бележки – ап. ${a}${S.names[a] ? " · " + S.names[a] : ""}`;
   $("#ndList").innerHTML = list.length
-    ? list.map((x, i) => `<li><span class="nd-date">${fmtDate(x.d)}</span><span class="nd-t">${esc(x.t)}</span><button type="button" class="del" data-ndel="${i}" title="Изтрий">×</button></li>`).join("")
+    ? list.map((x, i) => `<li${x.p ? ' class="pr"' : ""}><span class="nd-date">${fmtDate(x.d)}</span><span class="nd-t">${esc(x.t)}</span>
+        <label class="np" title="Да излиза ли на листа с длъжниците"><input type="checkbox" data-nprint="${i}"${x.p ? " checked" : ""}> 🖨 на листа</label>
+        <button type="button" class="del" data-ndel="${i}" title="Изтрий">×</button></li>`).join("")
     : `<li class="empty">Няма бележки за този апартамент.</li>`;
 }
 function refreshNoteBtn(a){ const b = document.querySelector(`#grid [data-note="${a}"]`); if (b) b.outerHTML = noteBtn(a); }
 function addNote(){
   const txt = $("#ndText").value.trim(); if (!txt) return false;
-  (S.notes[noteApt] = S.notes[noteApt] || []).push({ d: isoToday(), t: txt });
-  $("#ndText").value = ""; save(); renderNotes(); refreshNoteBtn(noteApt);
+  (S.notes[noteApt] = S.notes[noteApt] || []).push(Object.assign({ d: isoToday(), t: txt }, $("#ndPrint").checked ? { p: true } : {}));
+  $("#ndText").value = ""; $("#ndPrint").checked = false;   // всяка нова бележка е лична, освен ако изрично не я отметнеш
+  save(); renderNotes(); refreshNoteBtn(noteApt);
   return true;
 }
 $("#ndAdd").onclick = () => { addNote(); $("#ndText").focus(); };
@@ -591,6 +603,12 @@ $("#ndClose").onclick = () => { addNote(); $("#noteDlg").close(); };
 $("#noteDlg").addEventListener("cancel", () => addNote());   // Esc
 $("#noteDlg").addEventListener("close", () => addNote());
 $("#ndText").addEventListener("keydown", e => { if (e.key === "Enter" && e.ctrlKey){ e.preventDefault(); addNote(); } });
+$("#ndList").addEventListener("change", e => {
+  const i = e.target.dataset.nprint; if (i === undefined) return;
+  const n = S.notes[noteApt][+i];
+  if (e.target.checked) n.p = true; else delete n.p;
+  save(); renderNotes(); refreshNoteBtn(noteApt);
+});
 $("#ndList").addEventListener("click", e => {
   const i = e.target.dataset.ndel; if (i === undefined) return;
   if (!confirm("Да изтрия ли тази бележка?")) return;
@@ -664,7 +682,9 @@ $("#printDebtors").onclick = () => {
     const d = debt(a); if (!(d > 0)) continue;
     total += d; cnt++;
     const ex = S.extras.filter(e => xUnpaid(a).includes(e.id)).map(e => `${esc(e.title)} (${money(e.amount)})`).join("<br>") || "—";
-    rows += `<tr><td class="apt"><span class="p-num">${a}</span></td><td>${esc(S.names[a]) || "&nbsp;"}${S.room[a] ? `<br><small>✓ със стаичка</small>` : ""}</td><td>${monthsDetail(a)}</td><td>${ex}</td><td class="num"><b>${money(d)}</b></td></tr>`;
+    const pn = notesOf(a).filter(x => x.p);
+    rows += `<tr${pn.length ? ' class="has-note"' : ""}><td class="apt"><span class="p-num">${a}</span></td><td>${esc(S.names[a]) || "&nbsp;"}${S.room[a] ? `<br><small>✓ със стаичка</small>` : ""}</td><td>${monthsDetail(a)}</td><td>${ex}</td><td class="num"><b>${money(d)}</b></td></tr>` +
+      (pn.length ? `<tr class="p-noterow"><td></td><td colspan="4">${pn.map(x => `Бележка: ${esc(x.t)} <small>(${fmtDate(x.d)})</small>`).join("<br>")}</td></tr>` : "");
   }
   const hero = `${tape("tapeTop")}
     <div class="p-hero">${ICON_BLOCK}
