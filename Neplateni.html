@@ -1,0 +1,749 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Неплатени такси</title>
+<style id="pagestyle"></style>
+<style>
+:root{
+  --ink:#1c1c1e; --muted:#6e6e73; --line:#e4e4e7; --bg:#f4f4f2; --card:#fff;
+  --accent:#1f3d7a; --bad:#c0392b; --bad-bg:#fbe9e7; --ok:#2e7d32;
+}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.45 "Segoe UI",system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--bg)}
+button,input{font:inherit;color:inherit}
+.app{max-width:1400px;margin:0 auto;padding:20px 16px 60px}
+
+/* header */
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;margin-bottom:18px}
+header h1{margin:0;font-size:22px;letter-spacing:.2px}
+header h1 small{display:block;font-size:12px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px}
+#building{flex:1;min-width:220px;font-size:18px;font-weight:600;border:1px dashed transparent;background:transparent;padding:6px 8px;border-radius:8px}
+#building:hover{border-color:var(--line)} #building:focus{outline:none;border-color:var(--accent);background:#fff}
+#saved{font-size:13px;color:var(--ok);opacity:0;transition:opacity .3s}
+#saved.show{opacity:1}
+
+/* file bar */
+.filebar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:14px;border:1px solid}
+.filebar.ok{background:#eef6ee;border-color:#cfe5cf;color:#1e5a22;padding:8px 16px}
+.filebar.warn{background:#fff7e0;border-color:#f1dc9c}
+.filebar.bad{background:var(--bad-bg);border-color:#f3c2bb;color:#8c2318}
+.fb-btns{display:flex;gap:8px;flex-wrap:wrap}
+
+/* cards */
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.row{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:flex-end}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+label.f input{width:110px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:15px;text-transform:none;letter-spacing:0;color:var(--ink)}
+label.f input:focus{outline:none;border-color:var(--accent)}
+.year{display:flex;align-items:center;gap:6px}
+.year b{font-size:20px;min-width:56px;text-align:center}
+.btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 12px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:#bbb;background:#fafafa}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:#17305f}
+.btn.sm{padding:3px 9px;font-size:13px}
+
+.stats{display:flex;flex-wrap:wrap;gap:12px;margin-left:auto}
+.stat{background:var(--bg);border-radius:10px;padding:8px 14px;min-width:120px}
+.stat span{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+.stat b{font-size:19px}
+.stat.bad b{color:var(--bad)}
+
+h2{font-size:13px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin:0 0 10px}
+.extras{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.chip{display:flex;align-items:center;gap:8px;background:var(--bg);border-radius:999px;padding:4px 6px 4px 12px;font-size:14px}
+.chip i{font-style:normal;color:var(--muted)}
+.chip button{border:0;background:transparent;cursor:pointer;color:var(--muted);font-size:16px;line-height:1;padding:2px 6px;border-radius:50%}
+.chip button:hover{background:#e5e5e5;color:var(--bad)}
+.addx{display:flex;flex-wrap:wrap;gap:8px}
+.addx input{padding:7px 10px;border:1px solid var(--line);border-radius:8px}
+.addx input:focus{outline:none;border-color:var(--accent)}
+#xTitle{width:260px} #xAmount{width:110px}
+.empty{color:var(--muted);font-size:14px}
+
+/* table */
+.hint{font-size:13px;color:var(--muted);margin:0 0 10px}
+.hint .x-demo{display:inline-block;width:18px;height:18px;line-height:18px;text-align:center;background:var(--bad-bg);color:var(--bad);border-radius:4px;font-weight:700;font-size:12px}
+.tablewrap{overflow-x:auto}
+table.grid{border-collapse:separate;border-spacing:0;width:100%;font-size:14px}
+.grid th{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:8px 4px;border-bottom:2px solid var(--line);background:#fff;position:sticky;top:0}
+.grid th.c-m,.grid th.c-x{cursor:pointer;user-select:none}
+.grid th.c-m:hover,.grid th.c-x:hover{color:var(--accent)}
+.grid th.c-x{max-width:110px}
+.grid th.c-x span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:none;letter-spacing:0}
+.grid th.c-x small{display:block;font-weight:400;text-transform:none}
+.grid td{padding:3px 4px;border-bottom:1px solid var(--line);text-align:center}
+.grid tbody tr:hover td{background:#fafaf8}
+.grid td.apt{font-weight:700;width:46px}
+.grid tr.debtor td.apt{color:var(--bad)}
+.grid td.name{text-align:left;min-width:150px}
+.grid td input{width:100%;border:1px solid transparent;background:transparent;padding:5px 6px;border-radius:6px}
+.grid td input:hover{border-color:var(--line)}
+.grid td input:focus{outline:none;border-color:var(--accent);background:#fff}
+.grid td.fee{width:80px;min-width:80px} .grid td.fee input{text-align:right}
+.grid td.m,.grid td.x{cursor:pointer;width:46px;height:34px;user-select:none}
+.grid td.m::after,.grid td.x::after{content:"";display:inline-block;width:26px;height:26px;line-height:26px;border-radius:6px;border:1px solid #eee;font-weight:700}
+.grid td.m:hover::after,.grid td.x:hover::after{border-color:#bbb}
+.grid td.on::after{content:"✕";background:var(--bad-bg);border-color:#f3c2bb;color:var(--bad)}
+.grid td.m.on::after{content:attr(data-v);width:32px;font-size:11px}
+.grid td.apt{width:66px}
+.grid td.apt label{display:flex;align-items:center;gap:7px;cursor:pointer}
+.grid td.apt input{width:auto;margin:0;padding:0;cursor:pointer;accent-color:var(--accent)}
+.grid td.total{text-align:right;font-weight:700;white-space:nowrap;padding-right:10px;width:100px}
+.grid td.total.zero{color:#c7c7cc;font-weight:400}
+.grid tfoot td{border-bottom:0;border-top:2px solid var(--ink);font-weight:700;padding:10px 4px}
+.note{font-size:12px;color:var(--muted);margin-top:8px}
+
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.actions .sep{flex:1}
+
+/* ---------- PRINT ---------- */
+#print{display:none}
+@media print{
+  body{background:#fff;color:#000;font-family:"Segoe UI",Arial,sans-serif}
+  .app{display:none!important}
+  #print{display:block}
+}
+.p-head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #000;padding-bottom:8px;margin-bottom:4px}
+.p-head .t1{font-size:10pt;letter-spacing:3px;text-transform:uppercase}
+.p-head .t2{font-family:Georgia,"Times New Roman",serif;font-size:22pt;font-weight:700;line-height:1.1}
+.p-head .meta{text-align:right;font-size:9.5pt;line-height:1.5}
+.p-sub{border-bottom:1px solid #000;font-size:9.5pt;padding:4px 0 6px;margin-bottom:14px;display:flex;justify-content:space-between}
+.p-table{width:100%;border-collapse:collapse;font-size:10pt}
+.p-table th{font-size:8pt;text-transform:uppercase;letter-spacing:1px;text-align:left;border-bottom:1.5px solid #000;padding:6px 6px}
+.p-table td{border-bottom:.5px solid #999;padding:7px 6px;vertical-align:top}
+.p-table tr{page-break-inside:avoid}
+.p-table .num{text-align:right;white-space:nowrap}
+.p-table .apt{font-weight:700;font-size:12pt;width:40px}
+.p-table tfoot td{border-top:2px solid #000;border-bottom:0;font-weight:700;font-size:11pt;padding-top:9px}
+.p-table .yr{font-weight:700}
+.p-grid{width:100%;border-collapse:collapse;font-size:8.5pt}
+.p-grid th,.p-grid td{border:.5px solid #666;padding:4px 3px;text-align:center}
+.p-grid th{font-size:7.5pt;text-transform:uppercase;letter-spacing:.5px;background:#eee;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.p-grid td.l{text-align:left}
+.p-grid td.b{font-weight:700}
+.p-grid td.xx{font-weight:700;font-size:10pt}
+.p-grid tr{page-break-inside:avoid}
+.p-grid tfoot td{border-top:2px solid #000;font-weight:700;white-space:nowrap}
+.p-grid td.b{white-space:nowrap}
+.p-sign{display:flex;justify-content:flex-end;margin-top:40px;font-size:10pt}
+.p-sign div{width:40%;border-top:1px solid #000;padding-top:4px;text-align:center}
+.p-none{font-size:12pt;padding:30px 0;text-align:center}
+
+/* лист с длъжници – „обява“ */
+.p-tape{display:block;margin:0 0 6mm}
+.p-tape.bottom{margin:8mm 0 0}
+.p-hero{display:flex;align-items:center;gap:6mm;margin-bottom:6mm}
+.p-icon{width:32mm;height:32mm;flex:none}
+.p-hero-t{flex:1;min-width:0}
+.p-kicker{font-size:11pt;font-weight:800;letter-spacing:5px;text-transform:uppercase}
+.p-title{font-family:Georgia,"Times New Roman",serif;font-size:31pt;font-weight:700;line-height:1.05;margin:1.5mm 0 2mm}
+.p-meta{font-size:10.5pt}
+.p-count{border:2.5pt solid #000;border-radius:4mm;padding:3mm 5mm;text-align:center;flex:none}
+.p-count b{display:block;font-family:Georgia,serif;font-size:32pt;line-height:1}
+.p-count span{display:block;font-size:8pt;text-transform:uppercase;letter-spacing:1px;margin-top:1mm}
+.p-call{display:flex;gap:4mm;align-items:center;border:1.5pt solid #000;border-left:7pt solid #000;padding:3mm 5mm;margin-bottom:7mm;font-size:11.5pt;line-height:1.55}
+.p-call svg{width:12mm;height:12mm;flex:none}
+.p-call small{font-size:9pt}
+.p-blank{display:inline-block;border-bottom:1px solid #000;height:1.1em;vertical-align:bottom}
+.p-num{display:inline-flex;align-items:center;justify-content:center;width:9.5mm;height:9.5mm;border:2pt solid #000;border-radius:50%;font-weight:800;font-size:12pt}
+.p-table.notice td{padding:8px 6px;vertical-align:middle}
+.p-table.notice .apt{width:15mm}
+.p-table.notice td.num{font-size:12pt}
+.p-totalbox{display:flex;align-items:baseline;gap:6mm;width:fit-content;margin:6mm 0 0 auto;border:2.5pt solid #000;padding:2.5mm 6mm}
+.p-totalbox span{font-size:9pt;text-transform:uppercase;letter-spacing:2px}
+.p-totalbox b{font-family:Georgia,serif;font-size:20pt}
+.p-duties{margin-top:7mm;border:1pt solid #000;padding:3mm 5mm;font-size:9.5pt;line-height:1.45;page-break-inside:avoid}
+.p-duties-h{font-weight:800;text-transform:uppercase;letter-spacing:2px;font-size:9pt;margin-bottom:1mm}
+.p-duties ol{margin:1.5mm 0 1.5mm 5mm;padding:0}
+.p-duties li{margin:.4mm 0}
+.p-duties-foot{font-weight:700}
+/* лист за таблото: задължения по ЗУЕС */
+.pd-sec{width:32mm;height:32mm;flex:none}
+.pd-list{list-style:none;margin:0;padding:0}
+.pd-list li{display:flex;gap:5mm;align-items:flex-start;padding:2.2mm 0;border-bottom:.5pt solid #999;page-break-inside:avoid}
+.pd-list li:last-child{border-bottom:0}
+.pd-list .p-num{flex:none;margin-top:.5mm}
+.pd-list b{display:block;font-size:12.5pt;margin-bottom:.4mm}
+.pd-list .t{font-size:10.5pt;line-height:1.4}
+.pd-foot{border:1.5pt solid #000;border-left:7pt solid #000;padding:2.5mm 5mm;margin-top:4mm;font-size:10.5pt;line-height:1.5;page-break-inside:avoid}
+.pd-src{font-size:8.5pt;margin-top:3mm;text-align:center}
+label.chk{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;align-self:center;padding-top:16px}
+label.chk input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+
+/* бележки */
+.grid td.name .nm{display:flex;align-items:center;gap:2px}
+.grid td.name .nm input{flex:1;min-width:0}
+.nb{flex:none;border:1px solid transparent;background:transparent;cursor:pointer;border-radius:6px;padding:3px 5px;font-size:14px;line-height:1;opacity:.3;position:relative}
+.nb:hover{opacity:1;border-color:var(--line);background:#fff}
+.nb.has{opacity:1}
+.nb span{position:absolute;top:-5px;right:-5px;background:var(--accent);color:#fff;font-size:10px;font-weight:700;border-radius:999px;min-width:15px;height:15px;line-height:15px;text-align:center;padding:0 3px}
+dialog#noteDlg{border:0;border-radius:14px;padding:0;width:min(520px,calc(100vw - 32px));box-shadow:0 20px 60px rgba(0,0,0,.25);color:var(--ink)}
+dialog#noteDlg::backdrop{background:rgba(0,0,0,.35)}
+.nd{padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+.nd h3{margin:0;font-size:17px}
+#ndList{list-style:none;margin:0;padding:0;max-height:300px;overflow:auto;display:flex;flex-direction:column;gap:6px}
+#ndList li{display:flex;gap:10px;align-items:flex-start;background:var(--bg);border-radius:8px;padding:8px 6px 8px 10px}
+#ndList li.empty{background:none;padding:0;color:var(--muted)}
+.nd-date{font-size:12px;color:var(--muted);white-space:nowrap;padding-top:2px}
+.nd-t{flex:1;white-space:pre-wrap;word-break:break-word}
+#ndList .del{border:0;background:transparent;cursor:pointer;color:var(--muted);font-size:16px;padding:0 6px;border-radius:50%}
+#ndList .del:hover{color:var(--bad);background:#e5e5e5}
+#ndText{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;resize:vertical}
+#ndText:focus{outline:none;border-color:var(--accent)}
+.nd-btns{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.nd-btns small{color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1><small>Входна каса</small>Неплатени такси</h1>
+    <input id="building" placeholder="Напиши адрес / блок / вход…">
+    <span id="saved">✓ Запазено</span>
+  </header>
+
+  <div id="fileBar" class="filebar warn"></div>
+
+  <div class="card">
+    <div class="row">
+      <label class="f">Брой апартаменти<input id="apts" type="number" min="1" max="500"></label>
+      <label class="f">Месечна такса (€)<input id="fee" type="number" min="0" step="0.01"></label>
+      <div class="f" style="display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px">Година</span>
+        <div class="year"><button class="btn sm" id="yPrev">‹</button><b id="yLabel"></b><button class="btn sm" id="yNext">›</button></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><span>Длъжници</span><b id="sDebtors">0</b></div>
+        <div class="stat"><span>Неплатени месеци</span><b id="sMonths">0</b></div>
+        <div class="stat bad"><span>Общо дълг</span><b id="sTotal">0</b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Допълнителни работи (ремонти, почистване и др.)</h2>
+    <div class="extras" id="extras"></div>
+    <form class="addx" id="addx">
+      <input id="xTitle" placeholder="Напр. Ремонт на покрив" required>
+      <input id="xAmount" type="number" min="0" step="0.01" placeholder="Сума (€)" required>
+      <button class="btn" type="submit">+ Добави</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <p class="hint">Кликни върху месец → става <span class="x-demo">10</span> = <b>неплатено</b>, със сумата от „Такса“ в този момент. Кликни пак, за да го изчистиш.
+      <b>Десен клик</b> върху месец → пишеш друга сума само за него. Ако смениш таксата, вече отбелязаните месеци <b>не</b> се променят.
+      Клик върху името на месеца маркира/изчиства <b>всички</b>. Тикчето до номера = <b>има стаичка</b>, а 📝 до името = <b>бележки</b>.</p>
+    <div class="tablewrap"><table class="grid" id="grid"></table></div>
+    <p class="note">„Дълг" включва неплатените месеци от <b>всички</b> години + неплатените допълнителни работи.</p>
+  </div>
+
+  <div class="card">
+    <h2>За листа с длъжниците (по желание – празното остава за попълване с химикал)</h2>
+    <div class="row">
+      <label class="f">Касиер<input id="cashier" style="width:200px" placeholder="Име"></label>
+      <label class="f">Телефон<input id="phone" style="width:150px" placeholder="0888 …"></label>
+      <label class="f">Платете до<input id="deadline" type="date" style="width:160px"></label>
+      <label class="chk"><input type="checkbox" id="showDuties"> Добави на листа <b>основните задължения по ЗУЕС</b></label>
+    </div>
+  </div>
+
+  <div class="card actions">
+    <button class="btn primary" id="printDebtors">🖨 Печат – списък длъжници</button>
+    <button class="btn" id="printGrid">🖨 Печат – цялата таблица за годината</button>
+    <button class="btn" id="printDuties">🖨 Печат – задълженията (за таблото)</button>
+    <span class="sep"></span>
+    <button class="btn" id="exportBtn">💾 Резервно копие</button>
+    <button class="btn" id="importBtn">📂 Зареди копие</button>
+    <input type="file" id="importFile" accept=".json,application/json" hidden>
+  </div>
+</div>
+
+<dialog id="noteDlg">
+  <div class="nd">
+    <h3 id="ndTitle"></h3>
+    <ul id="ndList"></ul>
+    <textarea id="ndText" rows="3" placeholder="Напр. Обеща да плати до 15-ти. Разбрахме се на части…"></textarea>
+    <div class="nd-btns"><small>Датата се слага сама.</small>
+      <span><button class="btn" id="ndClose" type="button">Затвори</button> <button class="btn primary" id="ndAdd" type="button">+ Добави бележка</button></span></div>
+  </div>
+</dialog>
+
+<div id="print"></div>
+
+<script>
+const KEY = "neplateni-taksi-v1";
+const M_SHORT = ["Яну","Фев","Мар","Апр","Май","Юни","Юли","Авг","Сеп","Окт","Ное","Дек"];
+const M_LOW = ["яну","фев","мар","апр","май","юни","юли","авг","сеп","окт","ное","дек"];
+const $ = s => document.querySelector(s);
+const pad = n => String(n).padStart(2,"0");
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const money = n => (Math.round((+n||0)*100)/100).toFixed(2).replace(".", ",") + " €";
+
+function blank(){
+  return { building:"", apartments:20, fee:10, year:new Date().getFullYear(), cashier:"", phone:"", deadline:"",
+           names:{}, fees:{}, unpaid:{}, extras:[], extraUnpaid:{}, room:{}, notes:{}, showDuties:true };
+}
+/* Зарежда данни и ги обновява от стари версии:
+   - неплатените месеци стават { "2026-03": сума } – всеки месец помни своята сума;
+   - старият раздел „Помещения“ става тикче „има стаичка“, а делът се прибавя към таксата. */
+let migrated = false;
+function hydrate(d){
+  const s = Object.assign(blank(), d);
+  const oldFee = a => { const v = parseFloat(s.fees[a]); return isNaN(v) ? (+s.fee || 0) : v; };
+  const rooms = Array.isArray(s.rooms) ? s.rooms.filter(r => r && Array.isArray(r.apts) && r.apts.length) : [];
+  const share = r => (+r.fee || 0) / r.apts.length;
+  const roomMonthsOld = a => rooms.flatMap(r => r.apts.includes(+a) ? (s.roomUnpaid?.[r.id + ":" + a] || []).map(k => [k, share(r)]) : []);
+  const aptsSeen = new Set([...Object.keys(s.unpaid || {}), ...rooms.flatMap(r => r.apts.map(String))]);
+  const out = {};
+  for (const a of aptsSeen){
+    const cur = s.unpaid[a];
+    const obj = Array.isArray(cur) ? Object.fromEntries(cur.map(k => [k, oldFee(a)])) : Object.assign({}, cur || {});
+    if (Array.isArray(cur)) migrated = true;
+    for (const [k, v] of roomMonthsOld(a)){ obj[k] = (obj[k] ?? 0) + v; migrated = true; }
+    if (Object.keys(obj).length) out[a] = obj;
+  }
+  s.unpaid = out;
+  if ("rooms" in s || "roomUnpaid" in s){
+    for (const r of rooms) for (const a of r.apts){
+      s.room[a] = true;
+      if (share(r) > 0) s.fees[a] = Math.round((oldFee(a) + share(r)) * 100) / 100;
+    }
+    delete s.rooms; delete s.roomUnpaid; migrated = true;
+  }
+  return s;
+}
+function load(){
+  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && typeof d === "object") return hydrate(d); } catch(e){}
+  return blank();
+}
+let S = load();
+let savedTimer, writeTimer;
+function flashSaved(text){
+  const el = $("#saved"); el.textContent = text; el.classList.add("show");
+  clearTimeout(savedTimer); savedTimer = setTimeout(() => el.classList.remove("show"), 1400);
+}
+function saveLocal(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){} }
+function save(){
+  saveLocal();
+  if (SERVER){ setUnsynced(true); clearTimeout(writeTimer); writeTimer = setTimeout(writeFile, 250); }
+  else flashSaved("✓ Запазено само в браузъра");
+}
+try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch(e){}
+
+/* ---------- запис във файла danni.json (програмата се пуска със Start.bat) ---------- */
+const SERVER = location.protocol === "http:" || location.protocol === "https:";
+const UNSYNCED = KEY + "-unsynced";
+const STOPPED = "Програмата е спряна. Пусни <b>Start.bat</b> отново – промените ти са запазени и ще се запишат.";
+let fileState = SERVER ? "connecting" : "nofile", fileErr = "", initialized = false;
+const setUnsynced = on => { try { on ? localStorage.setItem(UNSYNCED, "1") : localStorage.removeItem(UNSYNCED); } catch(e){} };
+const isUnsynced = () => { try { return localStorage.getItem(UNSYNCED) === "1"; } catch(e){ return false; } };
+
+async function api(kind, body){
+  const r = await fetch(kind === "ping" ? "/api/ping" : "/api/data", {
+    method: kind === "save" ? "POST" : "GET", cache: "no-store", body,
+    headers: kind === "save" ? { "Content-Type": "application/json", "X-Neplateni": "1" } : {} });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return kind === "load" ? r.json() : null;
+}
+let writing = false, again = false;
+async function writeFile(){
+  if (!SERVER || !initialized) return;
+  if (writing){ again = true; return; }
+  writing = true;
+  try {
+    do { again = false; await api("save", JSON.stringify(S, null, 2)); } while (again);
+    setUnsynced(false);
+    if (fileState !== "ok"){ fileState = "ok"; renderFileBar(); }
+    flashSaved("✓ Записано във файла");
+  } catch(e){ fileState = "error"; fileErr = STOPPED; renderFileBar(); }
+  finally { writing = false; }
+}
+async function initFile(){
+  renderFileBar();
+  if (!SERVER) return;
+  try {
+    const d = isUnsynced() ? null : await api("load");   // има незаписани промени → те печелят
+    if (d && typeof d === "object" && "unpaid" in d){ S = hydrate(d); saveLocal(); renderAll(); }
+    initialized = true; fileState = "ok"; renderFileBar();
+    if (!d || migrated){ migrated = false; await writeFile(); }   // записва и обновения формат
+  } catch(e){ fileState = "error"; fileErr = "Не мога да се свържа с програмата. Пусни <b>Start.bat</b> отново."; renderFileBar(); }
+}
+async function ping(){
+  try {
+    await api("ping");
+    if (fileState === "error"){
+      if (!initialized) initFile();
+      else if (isUnsynced()) writeFile();
+      else { fileState = "ok"; renderFileBar(); }
+    }
+  } catch(e){ if (fileState === "ok"){ fileState = "error"; fileErr = STOPPED; renderFileBar(); } }
+}
+function renderFileBar(){
+  const v = {
+    nofile: ["warn", `⚠ Програмата е отворена направо и данните се пазят <b>само в браузъра</b>. Затвори я и я отваряй с двоен клик на <b>Start.bat</b> – тогава всичко се записва във файла <b>danni.json</b>.`],
+    connecting: ["ok", `Свързване…`],
+    ok: ["ok", `📁 Всичко се записва автоматично във файла <b>danni.json</b> в папката на програмата. Всеки ден се пази копие в папка <b>arhiv</b>.`],
+    error: ["bad", `⚠ ${fileErr}`, `<button class="btn primary" data-f="retry">Опитай пак</button>`],
+  }[fileState];
+  const bar = $("#fileBar");
+  bar.className = "filebar " + v[0];
+  bar.innerHTML = `<span>${v[1]}</span><span class="fb-btns">${v[2] || ""}</span>`;
+}
+$("#fileBar").addEventListener("click", e => {
+  if (e.target.closest("[data-f=retry]")) initialized ? writeFile() : initFile();
+});
+// Ако програмата е отворена в два таба – дръж ги еднакви.
+window.addEventListener("storage", e => {
+  if (e.key === KEY && e.newValue){ try { S = hydrate(JSON.parse(e.newValue)); renderAll(); } catch(_){} }
+});
+if (SERVER) setInterval(ping, 30000);
+
+/* ---------- calculations ---------- */
+const N = () => Math.max(1, Math.min(500, parseInt(S.apartments) || 1));
+const aptFee = a => { const v = parseFloat(S.fees[a]); return isNaN(v) ? (+S.fee || 0) : v; };
+const months = a => Object.keys(S.unpaid[a] || {});          // неплатени месеци ("2026-03", …)
+const amt = (a, k) => (S.unpaid[a] || {})[k];                    // сумата, записана за този месец
+const monthsDebt = a => Object.values(S.unpaid[a] || {}).reduce((t, v) => t + (+v || 0), 0);
+const xUnpaid = a => S.extraUnpaid[a] || [];
+function debt(a){
+  let t = monthsDebt(a);
+  for (const e of S.extras) if (xUnpaid(a).includes(e.id)) t += +e.amount || 0;
+  return t;
+}
+// on=true → неплатен със сумата value (по подразбиране сегашната такса); on=false → изчиства.
+function setMonth(a, k, on, value){
+  if (on) (S.unpaid[a] = S.unpaid[a] || {})[k] = value ?? aptFee(a);
+  else if (S.unpaid[a]){ delete S.unpaid[a][k]; if (!Object.keys(S.unpaid[a]).length) delete S.unpaid[a]; }
+}
+const shortAmt = n => String(Math.round((+n || 0) * 100) / 100).replace(".", ",");
+function paintCell(td, a){
+  const v = amt(a, td.dataset.k), on = v !== undefined;
+  td.classList.toggle("on", on);
+  if (on) td.dataset.v = shortAmt(v); else delete td.dataset.v;
+  td.title = on ? `Неплатено: ${money(v)} · десен клик = друга сума` : "Клик = неплатено · десен клик = с друга сума";
+}
+function toggleIn(obj, a, val, force){
+  const arr = obj[a] || (obj[a] = []);
+  const i = arr.indexOf(val);
+  const want = force === undefined ? i < 0 : force;
+  if (want && i < 0) arr.push(val);
+  if (!want && i >= 0) arr.splice(i, 1);
+  if (!arr.length) delete obj[a];
+  return want;
+}
+
+/* ---------- render ---------- */
+function renderSettings(){
+  $("#building").value = S.building;
+  $("#apts").value = S.apartments;
+  $("#fee").value = S.fee;
+  $("#yLabel").textContent = S.year;
+  $("#cashier").value = S.cashier; $("#phone").value = S.phone; $("#deadline").value = S.deadline;
+  $("#showDuties").checked = S.showDuties !== false;
+}
+function renderExtras(){
+  const box = $("#extras");
+  box.innerHTML = S.extras.length
+    ? S.extras.map(e => `<span class="chip">${esc(e.title)} <i>${money(e.amount)}</i><button data-del="${e.id}" title="Изтрий">×</button></span>`).join("")
+    : `<span class="empty">Няма добавени. Добави ремонт или друга работа, за да се появи като колона в таблицата.</span>`;
+}
+function renderGrid(){
+  const y = S.year;
+  let h = `<thead><tr><th>Ап.</th><th style="text-align:left">Собственик</th><th>Такса</th>`;
+  M_SHORT.forEach((m,i) => h += `<th class="c-m" data-col="${y}-${pad(i+1)}" title="Маркирай / изчисти месеца за всички">${m}</th>`);
+  S.extras.forEach(e => h += `<th class="c-x" data-xcol="${e.id}" title="${esc(e.title)} – маркирай / изчисти за всички"><span>${esc(e.title)}</span><small>${money(e.amount)}</small></th>`);
+  h += `<th style="text-align:right;padding-right:10px">Дълг</th></tr></thead><tbody>`;
+  for (let a = 1; a <= N(); a++){
+    const um = months(a), ux = xUnpaid(a);
+    h += `<tr data-a="${a}"><td class="apt"><label title="Тикче = има стаичка"><input type="checkbox" data-room="${a}"${S.room[a] ? " checked" : ""}>${a}</label></td>
+      <td class="name"><div class="nm"><input data-name="${a}" value="${esc(S.names[a])}" placeholder="—">${noteBtn(a)}</div></td>
+      <td class="fee"><input data-fee="${a}" type="number" min="0" step="0.01" value="${S.fees[a] ?? ""}" placeholder="${+S.fee||0}"></td>`;
+    for (let i = 1; i <= 12; i++){ const k = `${y}-${pad(i)}`, v = amt(a, k);
+      h += `<td class="m${v !== undefined ? " on" : ""}" data-k="${k}"${v !== undefined ? ` data-v="${shortAmt(v)}"` : ""}></td>`; }
+    S.extras.forEach(e => h += `<td class="x${ux.includes(e.id)?" on":""}" data-x="${e.id}"></td>`);
+    h += `<td class="total" data-total="${a}"></td></tr>`;
+  }
+  h += `</tbody><tfoot><tr><td colspan="${3 + 12 + S.extras.length}" style="text-align:right">Общо:</td><td class="total" id="gTotal"></td></tr></tfoot>`;
+  $("#grid").innerHTML = h;
+  document.querySelectorAll("#grid tbody td.m").forEach(td => paintCell(td, td.parentElement.dataset.a));
+  updateTotals();
+}
+function updateTotals(){
+  let total = 0, debtors = 0, mcount = 0;
+  for (let a = 1; a <= N(); a++){
+    const d = debt(a); total += d; mcount += months(a).length;
+    if (d > 0) debtors++;
+    const cell = document.querySelector(`[data-total="${a}"]`);
+    if (cell){ cell.textContent = d > 0 ? money(d) : "—"; cell.classList.toggle("zero", !(d > 0)); cell.parentElement.classList.toggle("debtor", d > 0); }
+  }
+  $("#gTotal").textContent = money(total);
+  $("#sDebtors").textContent = `${debtors} / ${N()}`;
+  $("#sMonths").textContent = mcount;
+  $("#sTotal").textContent = money(total);
+}
+function renderAll(){ renderSettings(); renderExtras(); renderGrid(); }
+
+/* ---------- events ---------- */
+$("#building").addEventListener("input", e => { S.building = e.target.value; save(); });
+$("#apts").addEventListener("change", e => { S.apartments = e.target.value; S.apartments = N(); e.target.value = S.apartments; save(); renderGrid(); });
+$("#fee").addEventListener("input", e => { S.fee = parseFloat(e.target.value) || 0; save(); document.querySelectorAll("[data-fee]").forEach(i => i.placeholder = S.fee); updateTotals(); });
+$("#yPrev").onclick = () => { S.year--; save(); renderSettings(); renderGrid(); };
+$("#yNext").onclick = () => { S.year++; save(); renderSettings(); renderGrid(); };
+["cashier", "phone", "deadline"].forEach(k => $("#" + k).addEventListener("input", e => { S[k] = e.target.value; save(); }));
+$("#showDuties").addEventListener("change", e => { S.showDuties = e.target.checked; save(); });
+
+$("#addx").addEventListener("submit", e => {
+  e.preventDefault();
+  const title = $("#xTitle").value.trim(), amount = parseFloat($("#xAmount").value);
+  if (!title || isNaN(amount)) return;
+  S.extras.push({ id: "x" + Date.now().toString(36), title, amount });
+  $("#xTitle").value = ""; $("#xAmount").value = "";
+  save(); renderExtras(); renderGrid(); $("#xTitle").focus();
+});
+$("#extras").addEventListener("click", e => {
+  const id = e.target.dataset.del; if (!id) return;
+  const ex = S.extras.find(x => x.id === id);
+  if (!confirm(`Да изтрия ли „${ex.title}"? Отметките за нея също ще изчезнат.`)) return;
+  S.extras = S.extras.filter(x => x.id !== id);
+  for (const a in S.extraUnpaid) toggleIn(S.extraUnpaid, a, id, false);
+  save(); renderExtras(); renderGrid();
+});
+
+const grid = $("#grid");
+grid.addEventListener("click", e => {
+  const nb = e.target.closest("[data-note]");
+  if (nb){ openNotes(nb.dataset.note); return; }
+  const td = e.target.closest("td.m, td.x");
+  if (td){
+    const a = td.parentElement.dataset.a;
+    if (td.classList.contains("m")){ setMonth(a, td.dataset.k, amt(a, td.dataset.k) === undefined); paintCell(td, a); }
+    else td.classList.toggle("on", toggleIn(S.extraUnpaid, a, td.dataset.x));
+    save(); updateTotals(); return;
+  }
+  const th = e.target.closest("th.c-m, th.c-x");
+  if (th){
+    if (th.classList.contains("c-m")){
+      const k = th.dataset.col; let all = true;
+      for (let a = 1; a <= N(); a++) if (amt(a, k) === undefined){ all = false; break; }
+      for (let a = 1; a <= N(); a++) if (all) setMonth(a, k, false); else if (amt(a, k) === undefined) setMonth(a, k, true);
+    } else {
+      const key = th.dataset.xcol; let all = true;
+      for (let a = 1; a <= N(); a++) if (!xUnpaid(a).includes(key)){ all = false; break; }
+      for (let a = 1; a <= N(); a++) toggleIn(S.extraUnpaid, a, key, !all);
+    }
+    save(); renderGrid();
+  }
+});
+// Десен клик върху месец → друга сума само за този месец.
+grid.addEventListener("contextmenu", e => {
+  const td = e.target.closest("td.m"); if (!td) return;
+  e.preventDefault();
+  const a = td.parentElement.dataset.a, k = td.dataset.k, [y, m] = k.split("-"), cur = amt(a, k);
+  const ans = prompt(`Ап. ${a}, ${M_LOW[+m - 1]} ${y} – неплатена сума (€).\nОстави празно, за да го изчистиш (платено).`, shortAmt(cur ?? aptFee(a)));
+  if (ans === null) return;
+  const v = parseFloat(ans.replace(",", "."));
+  if (ans.trim() === "") setMonth(a, k, false);
+  else if (isNaN(v) || v < 0){ alert("Това не е сума: " + ans); return; }
+  else setMonth(a, k, true, v);
+  paintCell(td, a); save(); updateTotals();
+});
+grid.addEventListener("input", e => {
+  const t = e.target;
+  if (t.dataset.name){ S.names[t.dataset.name] = t.value; if (!t.value) delete S.names[t.dataset.name]; save(); }
+  if (t.dataset.room){ if (t.checked) S.room[t.dataset.room] = true; else delete S.room[t.dataset.room]; save(); }
+  if (t.dataset.fee){ if (t.value === "") delete S.fees[t.dataset.fee]; else S.fees[t.dataset.fee] = parseFloat(t.value); save(); updateTotals(); }
+});
+
+/* ---------- бележки ---------- */
+const notesOf = a => S.notes[a] || [];
+const isoToday = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+function noteBtn(a){
+  const n = notesOf(a).length;
+  const tip = n ? notesOf(a).map(x => `${fmtDate(x.d)} – ${x.t}`).join("\n") : "Добави бележка";
+  return `<button type="button" class="nb${n ? " has" : ""}" data-note="${a}" title="${esc(tip)}">📝${n ? `<span>${n}</span>` : ""}</button>`;
+}
+let noteApt = null;
+function openNotes(a){
+  noteApt = a; renderNotes(); $("#ndText").value = "";
+  $("#noteDlg").showModal(); $("#ndText").focus();
+}
+function renderNotes(){
+  const a = noteApt, list = notesOf(a);
+  $("#ndTitle").textContent = `Бележки – ап. ${a}${S.names[a] ? " · " + S.names[a] : ""}`;
+  $("#ndList").innerHTML = list.length
+    ? list.map((x, i) => `<li><span class="nd-date">${fmtDate(x.d)}</span><span class="nd-t">${esc(x.t)}</span><button type="button" class="del" data-ndel="${i}" title="Изтрий">×</button></li>`).join("")
+    : `<li class="empty">Няма бележки за този апартамент.</li>`;
+}
+function refreshNoteBtn(a){ const b = document.querySelector(`#grid [data-note="${a}"]`); if (b) b.outerHTML = noteBtn(a); }
+function addNote(){
+  const txt = $("#ndText").value.trim(); if (!txt) return false;
+  (S.notes[noteApt] = S.notes[noteApt] || []).push({ d: isoToday(), t: txt });
+  $("#ndText").value = ""; save(); renderNotes(); refreshNoteBtn(noteApt);
+  return true;
+}
+$("#ndAdd").onclick = () => { addNote(); $("#ndText").focus(); };
+$("#ndClose").onclick = () => { addNote(); $("#noteDlg").close(); };
+// Написаното, но недобавено, не се губи при затваряне.
+$("#noteDlg").addEventListener("cancel", () => addNote());   // Esc
+$("#noteDlg").addEventListener("close", () => addNote());
+$("#ndText").addEventListener("keydown", e => { if (e.key === "Enter" && e.ctrlKey){ e.preventDefault(); addNote(); } });
+$("#ndList").addEventListener("click", e => {
+  const i = e.target.dataset.ndel; if (i === undefined) return;
+  if (!confirm("Да изтрия ли тази бележка?")) return;
+  S.notes[noteApt].splice(+i, 1); if (!S.notes[noteApt].length) delete S.notes[noteApt];
+  save(); renderNotes(); refreshNoteBtn(noteApt);
+});
+
+/* ---------- backup ---------- */
+$("#exportBtn").onclick = () => {
+  const d = new Date(), name = `neplateni-kopie-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.json`;
+  const url = URL.createObjectURL(new Blob([JSON.stringify(S, null, 2)], { type: "application/json" }));
+  const link = Object.assign(document.createElement("a"), { href: url, download: name });
+  document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+$("#importBtn").onclick = () => $("#importFile").click();
+$("#importFile").addEventListener("change", async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    if (!d || typeof d !== "object" || !("unpaid" in d)) throw new Error("Файлът не е копие от тази програма.");
+    if (!confirm("Сегашните данни ще бъдат заменени с тези от копието. Продължаваме ли?")) return;
+    S = hydrate(d); save(); renderAll();
+  } catch(err){ alert("Не мога да заредя файла: " + err.message); }
+});
+
+/* ---------- print ---------- */
+function today(){ const d = new Date(); return `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()} г.`; }
+function printHead(title, sub){
+  return `<div class="p-head"><div><div class="t1">${esc(S.building || "Етажна собственост")}</div><div class="t2">${title}</div></div>
+    <div class="meta">Към дата: <b>${today()}</b><br>Месечна такса: ${money(S.fee)}</div></div>
+    <div class="p-sub"><span>${sub}</span><span>Апартаменти: 1 – ${N()}</span></div>`;
+}
+const signs = () => `<div class="p-sign"><div>Касиер${S.cashier ? ": " + esc(S.cashier) : ""}</div></div>`;
+// Месеците, групирани по сума: „2026: яну, фев  3 × 10,00 €“
+function monthsDetail(a){
+  const by = {};
+  for (const [k, v] of Object.entries(S.unpaid[a] || {})) (by[v] = by[v] || []).push(k);
+  const groups = Object.entries(by).map(([v, ks]) => [+v, ks.sort()]).sort((x, y) => x[1][0] < y[1][0] ? -1 : 1);
+  return groups.map(([v, ks]) => `${monthsList(ks)}<br><small>${ks.length} × ${money(v)}</small>`).join('<div style="height:1.5mm"></div>') || "—";
+}
+function monthsList(arr){
+  const by = {};
+  arr.slice().sort().forEach(k => { const [y,m] = k.split("-"); (by[y] = by[y] || []).push(M_LOW[+m-1]); });
+  return Object.keys(by).sort().map(y => `<span class="yr">${y}:</span> ${by[y].join(", ")}`).join("<br>") || "—";
+}
+function doPrint(html, landscape){
+  $("#pagestyle").textContent = `@page{size:A4 ${landscape ? "landscape" : "portrait"};margin:14mm 12mm}`;
+  $("#print").innerHTML = html;
+  setTimeout(() => window.print(), 50);
+}
+// Иконка: блок с удивителна. SVG се печата в черно дори когато браузърът не печата фонове.
+const ICON_BLOCK = `<svg class="p-icon" viewBox="0 0 100 100" aria-hidden="true">
+  <line x1="4" y1="94" x2="70" y2="94" stroke="#000" stroke-width="4" stroke-linecap="round"/>
+  <rect x="14" y="12" width="48" height="82" fill="#fff" stroke="#000" stroke-width="5"/>
+  <rect x="10" y="7" width="56" height="7" fill="#000"/>
+  ${[22, 35, 48, 61].map(y => [21, 33.5, 46].map(x => `<rect x="${x}" y="${y}" width="9" height="8" fill="#000"/>`).join("")).join("")}
+  <rect x="31" y="75" width="14" height="19" fill="#000"/>
+  <circle cx="72" cy="68" r="24" fill="#000" stroke="#fff" stroke-width="5"/>
+  <rect x="68.5" y="52" width="7" height="20" rx="3" fill="#fff"/>
+  <circle cx="72" cy="81" r="4.2" fill="#fff"/>
+</svg>`;
+const ICON_BANG = `<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="19" fill="#000"/><rect x="17" y="8" width="6" height="16" rx="2.5" fill="#fff"/><circle cx="20" cy="30" r="3.5" fill="#fff"/></svg>`;
+// Предупредителна лента (като тиксо „внимание“).
+const tape = (id, cls = "") => `<svg class="p-tape ${cls}" width="100%" height="18" aria-hidden="true"><defs><pattern id="${id}" width="24" height="18" patternUnits="userSpaceOnUse" patternTransform="skewX(-40)"><rect width="12" height="18" fill="#000"/></pattern></defs><rect width="100%" height="18" fill="url(#${id})"/></svg>`;
+const fmtDate = iso => { if (!iso) return ""; const [y, m, d] = iso.split("-"); return `${d}.${m}.${y} г.`; };
+const blankLine = w => `<span class="p-blank" style="width:${w}"></span>`;
+
+$("#printDebtors").onclick = () => {
+  let rows = "", total = 0, cnt = 0;
+  for (let a = 1; a <= N(); a++){
+    const d = debt(a); if (!(d > 0)) continue;
+    total += d; cnt++;
+    const ex = S.extras.filter(e => xUnpaid(a).includes(e.id)).map(e => `${esc(e.title)} (${money(e.amount)})`).join("<br>") || "—";
+    rows += `<tr><td class="apt"><span class="p-num">${a}</span></td><td>${esc(S.names[a]) || "&nbsp;"}${S.room[a] ? `<br><small>✓ със стаичка</small>` : ""}</td><td>${monthsDetail(a)}</td><td>${ex}</td><td class="num"><b>${money(d)}</b></td></tr>`;
+  }
+  const hero = `${tape("tapeTop")}
+    <div class="p-hero">${ICON_BLOCK}
+      <div class="p-hero-t"><div class="p-kicker">Внимание, съседи!</div><div class="p-title">Неплатени задължения</div>
+        <div class="p-meta">${esc(S.building || "Етажна собственост")} &nbsp;·&nbsp; към ${today()}</div></div>
+      ${cnt ? `<div class="p-count"><b>${cnt}</b><span>${cnt === 1 ? "апартамент" : "апартамента"}<br>не са платили</span></div>` : ""}
+    </div>`;
+  const call = `<div class="p-call">${ICON_BANG}<div>
+      Моля, погасете задълженията си <b>до ${fmtDate(S.deadline) || blankLine("30mm")}</b>
+      при касиера <b>${esc(S.cashier) || blankLine("45mm")}</b>, тел. <b>${esc(S.phone) || blankLine("32mm")}</b>.<br>
+      <small>Ако вече сте платили – благодарим и не обръщайте внимание на този списък. Благодарим на всички редовни платци!</small></div></div>`;
+  const body = cnt
+    ? `${call}<table class="p-table notice"><thead><tr><th>Ап.</th><th>Собственик</th><th>Неплатени месеци</th><th>Допълнителни работи</th><th class="num">Сума</th></tr></thead>
+       <tbody>${rows}</tbody></table>
+       <div class="p-totalbox"><span>Общо дължимо</span><b>${money(total)}</b></div>`
+    : `<div class="p-none">Няма неплатени задължения. Благодарим на всички! 🎉</div>`;
+  const duties = S.showDuties === false ? "" : `<div class="p-duties">
+      <div class="p-duties-h">Какво казва законът</div>
+      Според Закона за управление на етажната собственост (чл. 6 ЗУЕС) всеки собственик е длъжен:
+      <ol>
+        <li>да плаща в срок разходите за <b>управление и поддържане на общите части</b> (почистване, ток на входа, асансьор и др.);</li>
+        <li>да плаща своя дял от разходите за <b>ремонт и обновяване на общите части</b>, приети от общото събрание;</li>
+        <li>да изпълнява решенията на общото събрание и на управителя;</li>
+        <li>да спазва правилника за вътрешния ред и да не пречи на спокойствието на съседите;</li>
+        <li>да подава декларация за вписване в книгата на етажната собственост (членове на домакинството, обитатели, домашни любимци).</li>
+      </ol>
+      <div class="p-duties-foot">Неплатените задължения могат да бъдат потърсени по съдебен ред, заедно с разноските по делото.</div>
+    </div>`;
+  doPrint(hero + body + (cnt ? duties : "") + signs() + tape("tapeBottom", "bottom"), false);
+};
+// Отделен лист за таблото на входа: основните задължения на собствениците (чл. 6 ЗУЕС).
+const ICON_LAW = `<svg class="pd-sec" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="47" fill="#000"/><circle cx="50" cy="50" r="40" fill="none" stroke="#fff" stroke-width="2.5"/><text x="50" y="69" text-anchor="middle" font-family="Georgia,'Times New Roman',serif" font-size="58" font-weight="700" fill="#fff">§</text></svg>`;
+const DUTIES = [
+  ["Плащайте месечната такса навреме", "Разходите за управление и поддържане на общите части – почистване, ток на входа, асансьор и др. – се поделят между всички собственици."],
+  ["Участвайте в разходите за ремонт", "Всеки плаща своя дял от ремонта и обновяването на общите части, решени от общото събрание."],
+  ["Спазвайте решенията", "Решенията на общото събрание и на управителя са задължителни за всички собственици, ползватели и обитатели."],
+  ["Пазете общите части и спокойствието", "Не увреждайте стълбището, асансьора, входа и другите общи части. Спазвайте правилника за вътрешния ред и не пречете на съседите."],
+  ["Осигурявайте достъп при нужда", "Когато е необходимо за ремонт или поддръжка на общите части, осигурете достъп до своя имот."],
+  ["Подайте декларация", "За вписване в книгата на етажната собственост – членовете на домакинството, обитателите и домашните любимци."],
+  ["Отглеждайте домашните любимци отговорно", "Така, че да не безпокоят съседите и да не замърсяват общите части."],
+];
+$("#printDuties").onclick = () => {
+  const html = `${tape("tapeTopD")}
+    <div class="p-hero">${ICON_LAW}
+      <div class="p-hero-t"><div class="p-kicker">Информация за всички живущи</div><div class="p-title">Задължения на собствениците</div>
+        <div class="p-meta">в етажната собственост · по чл. 6 от ЗУЕС &nbsp;·&nbsp; ${esc(S.building || "Етажна собственост")}</div></div>
+    </div>
+    <ol class="pd-list">${DUTIES.map(([h, t], i) => `<li><span class="p-num">${i + 1}</span><div><b>${h}</b><span class="t">${t}</span></div></li>`).join("")}</ol>
+    <div class="pd-foot"><b>Неплатените задължения могат да бъдат потърсени по съдебен ред, заедно с разноските по делото.</b><br>
+      Плащания и въпроси: касиер <b>${esc(S.cashier) || blankLine("45mm")}</b>, тел. <b>${esc(S.phone) || blankLine("32mm")}</b>.<br>
+      <small>Благодарим на всички, които плащат редовно и пазят входа чист и подреден!</small></div>
+    <div class="pd-src">Източник: Закон за управление на етажната собственост (ЗУЕС), чл. 6 · ${today()}</div>
+    ${tape("tapeBottomD", "bottom")}`;
+  doPrint(html, false);
+};
+$("#printGrid").onclick = () => {
+  const y = S.year;
+  let h = `<table class="p-grid"><thead><tr><th>Ап.</th><th>Стаичка</th><th>Собственик</th>${M_SHORT.map(m => `<th>${m}</th>`).join("")}${S.extras.map(e => `<th>${esc(e.title)}<br>${money(e.amount)}</th>`).join("")}<th>Дълг</th></tr></thead><tbody>`;
+  let total = 0;
+  for (let a = 1; a <= N(); a++){
+    const d = debt(a); total += d;
+    h += `<tr><td class="b">${a}</td><td>${S.room[a] ? "✓" : ""}</td><td class="l">${esc(S.names[a]) || ""}</td>`;
+    for (let i = 1; i <= 12; i++){ const v = amt(a, `${y}-${pad(i)}`); h += `<td class="xx">${v !== undefined ? shortAmt(v) : ""}</td>`; }
+    S.extras.forEach(e => h += `<td class="xx">${xUnpaid(a).includes(e.id) ? "✕" : ""}</td>`);
+    h += `<td class="b" style="text-align:right">${d > 0 ? money(d) : ""}</td></tr>`;
+  }
+  h += `</tbody><tfoot><tr><td colspan="${15 + S.extras.length}" style="text-align:right">Общо:</td><td style="text-align:right">${money(total)}</td></tr></tfoot></table>`;
+  const withNotes = []; for (let a = 1; a <= N(); a++) if (notesOf(a).length) withNotes.push(a);
+  if (withNotes.length){
+    h += `<div style="font-size:10pt;font-weight:700;text-transform:uppercase;letter-spacing:2px;margin:7mm 0 2mm">Бележки</div>
+      <table class="p-grid"><thead><tr><th style="width:12mm">Ап.</th><th style="width:45mm">Собственик</th><th>Бележки</th></tr></thead><tbody>` +
+      withNotes.map(a => `<tr><td class="b">${a}</td><td class="l">${esc(S.names[a]) || ""}</td><td class="l">${notesOf(a).map(x => `<b>${fmtDate(x.d)}</b> – ${esc(x.t)}`).join("<br>")}</td></tr>`).join("") +
+      `</tbody></table>`;
+  }
+  doPrint(printHead(`Такси за ${y} г.`, "Число в клетката = неплатена сума (€) &nbsp;·&nbsp; ✕ = неплатена доп. работа &nbsp;·&nbsp; Дългът включва и предходни години") + h + signs(), true);
+};
+
+renderAll();
+initFile();
+</script>
+</body>
+</html>

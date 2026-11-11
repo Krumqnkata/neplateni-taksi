@@ -1,0 +1,8 @@
+# Истинските данни на входа – НИКОГА в git
+danni.json
+danni.json.tmp
+arhiv/
+neplateni-kopie-*.json
+
+# локални настройки
+.claude/
